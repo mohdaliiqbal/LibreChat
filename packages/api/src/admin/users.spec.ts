@@ -58,6 +58,10 @@ function createDeps(overrides: Partial<AdminUsersDeps> = {}): AdminUsersDeps {
       .mockResolvedValue({ deletedCount: 1, message: 'User was deleted successfully.' }),
     deleteConfig: jest.fn().mockResolvedValue(null),
     deleteAclEntries: jest.fn().mockResolvedValue(undefined),
+    findBalanceByUser: jest.fn().mockResolvedValue(null),
+    upsertBalanceFields: jest.fn().mockResolvedValue({ tokenCredits: 0 }),
+    createTransaction: jest.fn().mockResolvedValue({ balance: 0 }),
+    resolveBalanceConfig: jest.fn().mockResolvedValue({ enabled: true }),
     ...overrides,
   };
 }
@@ -500,6 +504,192 @@ describe('createAdminUsersHandlers', () => {
 
       expect(status).toHaveBeenCalledWith(500);
       expect(json).toHaveBeenCalledWith({ error: 'Failed to delete user' });
+    });
+  });
+
+  describe('getUserBalance', () => {
+    it('rejects an invalid user id with 400', async () => {
+      const handlers = createAdminUsersHandlers(createDeps());
+      const { req, res, status, json } = createReqRes({ params: { id: 'not-an-id' } });
+
+      await handlers.getUserBalance(req, res);
+
+      expect(status).toHaveBeenCalledWith(400);
+      expect(json).toHaveBeenCalledWith({ error: 'Invalid user ID format' });
+    });
+
+    it('returns 404 when the user does not exist', async () => {
+      const deps = createDeps({ findUsers: jest.fn().mockResolvedValue([]) });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes({ params: { id: validUserId } });
+
+      await handlers.getUserBalance(req, res);
+
+      expect(status).toHaveBeenCalledWith(404);
+      expect(json).toHaveBeenCalledWith({ error: 'User not found' });
+    });
+
+    it('returns the user balance and enabled flag', async () => {
+      const deps = createDeps({
+        findUsers: jest.fn().mockResolvedValue([mockUser()]),
+        findBalanceByUser: jest.fn().mockResolvedValue({
+          tokenCredits: 12345,
+          autoRefillEnabled: true,
+          refillAmount: 1000,
+          refillIntervalValue: 30,
+          refillIntervalUnit: 'days',
+          lastRefill: new Date('2026-01-01'),
+        }),
+        resolveBalanceConfig: jest.fn().mockResolvedValue({ enabled: true }),
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes({ params: { id: validUserId } });
+
+      await handlers.getUserBalance(req, res);
+
+      expect(status).toHaveBeenCalledWith(200);
+      const response = json.mock.calls[0][0];
+      expect(response).toMatchObject({
+        userId: validUserId,
+        enabled: true,
+        tokenCredits: 12345,
+        autoRefillEnabled: true,
+        refillAmount: 1000,
+        lastRefill: new Date('2026-01-01').toISOString(),
+      });
+    });
+
+    it('defaults to zero credits when no balance record exists', async () => {
+      const deps = createDeps({
+        findUsers: jest.fn().mockResolvedValue([mockUser()]),
+        findBalanceByUser: jest.fn().mockResolvedValue(null),
+        resolveBalanceConfig: jest.fn().mockResolvedValue({ enabled: false }),
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, json } = createReqRes({ params: { id: validUserId } });
+
+      await handlers.getUserBalance(req, res);
+
+      const response = json.mock.calls[0][0];
+      expect(response).toMatchObject({ enabled: false, tokenCredits: 0, lastRefill: null });
+    });
+  });
+
+  describe('updateUserBalance', () => {
+    function withBody(
+      params: Record<string, string>,
+      body: Record<string, unknown>,
+    ): ReturnType<typeof createReqRes> {
+      const ctx = createReqRes({ params });
+      (ctx.req as unknown as { body: unknown }).body = body;
+      return ctx;
+    }
+
+    it('rejects an invalid user id with 400', async () => {
+      const handlers = createAdminUsersHandlers(createDeps());
+      const { req, res, status } = withBody({ id: 'nope' }, { mode: 'set', amount: 10 });
+
+      await handlers.updateUserBalance(req, res);
+
+      expect(status).toHaveBeenCalledWith(400);
+    });
+
+    it('rejects an unknown mode with 400', async () => {
+      const handlers = createAdminUsersHandlers(createDeps());
+      const { req, res, status, json } = withBody({ id: validUserId }, { mode: 'reset', amount: 10 });
+
+      await handlers.updateUserBalance(req, res);
+
+      expect(status).toHaveBeenCalledWith(400);
+      expect(json).toHaveBeenCalledWith({ error: "Field 'mode' must be 'set' or 'add'" });
+    });
+
+    it('rejects a non-finite amount with 400', async () => {
+      const handlers = createAdminUsersHandlers(createDeps());
+      const { req, res, status } = withBody({ id: validUserId }, { mode: 'set', amount: 'abc' });
+
+      await handlers.updateUserBalance(req, res);
+
+      expect(status).toHaveBeenCalledWith(400);
+    });
+
+    it('rejects a negative amount when mode is set', async () => {
+      const handlers = createAdminUsersHandlers(createDeps());
+      const { req, res, status } = withBody({ id: validUserId }, { mode: 'set', amount: -5 });
+
+      await handlers.updateUserBalance(req, res);
+
+      expect(status).toHaveBeenCalledWith(400);
+    });
+
+    it('returns 404 when the user does not exist', async () => {
+      const deps = createDeps({ findUsers: jest.fn().mockResolvedValue([]) });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status } = withBody({ id: validUserId }, { mode: 'set', amount: 100 });
+
+      await handlers.updateUserBalance(req, res);
+
+      expect(status).toHaveBeenCalledWith(404);
+    });
+
+    it('sets an absolute balance via upsertBalanceFields', async () => {
+      const upsertBalanceFields = jest.fn().mockResolvedValue({ tokenCredits: 500 });
+      const deps = createDeps({
+        findUsers: jest.fn().mockResolvedValue([mockUser()]),
+        upsertBalanceFields,
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = withBody({ id: validUserId }, { mode: 'set', amount: 500 });
+
+      await handlers.updateUserBalance(req, res);
+
+      expect(upsertBalanceFields).toHaveBeenCalledWith(validUserId, { tokenCredits: 500 });
+      expect(status).toHaveBeenCalledWith(200);
+      expect(json).toHaveBeenCalledWith({ userId: validUserId, mode: 'set', tokenCredits: 500 });
+    });
+
+    it('returns 409 for an add when balance is not enabled', async () => {
+      const createTransaction = jest.fn();
+      const deps = createDeps({
+        findUsers: jest.fn().mockResolvedValue([mockUser()]),
+        resolveBalanceConfig: jest.fn().mockResolvedValue({ enabled: false }),
+        createTransaction,
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status } = withBody({ id: validUserId }, { mode: 'add', amount: 100 });
+
+      await handlers.updateUserBalance(req, res);
+
+      expect(status).toHaveBeenCalledWith(409);
+      expect(createTransaction).not.toHaveBeenCalled();
+    });
+
+    it('adds credits via a transaction and returns the new balance', async () => {
+      const createTransaction = jest.fn().mockResolvedValue({ balance: 1100 });
+      const deps = createDeps({
+        findUsers: jest.fn().mockResolvedValue([mockUser()]),
+        resolveBalanceConfig: jest.fn().mockResolvedValue({ enabled: true }),
+        createTransaction,
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = withBody({ id: validUserId }, { mode: 'add', amount: 100 });
+
+      await handlers.updateUserBalance(req, res);
+
+      expect(createTransaction).toHaveBeenCalledWith({
+        user: validUserId,
+        tokenType: 'credits',
+        context: 'admin',
+        rawAmount: 100,
+        balance: { enabled: true },
+      });
+      expect(status).toHaveBeenCalledWith(200);
+      expect(json).toHaveBeenCalledWith({
+        userId: validUserId,
+        mode: 'add',
+        amount: 100,
+        tokenCredits: 1100,
+      });
     });
   });
 });

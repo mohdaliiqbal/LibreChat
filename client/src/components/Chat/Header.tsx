@@ -5,6 +5,7 @@ import { getConfigDefaults, PermissionTypes, Permissions } from 'librechat-data-
 import ModelSelector from './Menus/Endpoints/ModelSelector';
 import { useGetStartupConfig } from '~/data-provider';
 import ExportAndShareMenu from './ExportAndShareMenu';
+import LibreChatCredits from './LibreChatCredits';
 import { OpenSidebar, PresetsMenu } from './Menus';
 import BookmarkMenu from './Menus/BookmarkMenu';
 import { TemporaryChat } from './TemporaryChat';
@@ -71,6 +72,7 @@ function Header() {
 
         {!isSmallScreen && (
           <div className="flex items-center gap-2">
+            <LibreChatCredits />
             <ExportAndShareMenu
               isSharedButtonEnabled={startupConfig?.sharedLinksEnabled ?? false}
             />

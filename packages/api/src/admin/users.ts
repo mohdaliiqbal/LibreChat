@@ -4,14 +4,29 @@ import { logger, isValidObjectIdString } from '@librechat/data-schemas';
 import type {
   IUser,
   IConfig,
+  IBalance,
+  IBalanceUpdate,
   AdminUserListItem,
   AdminUserSearchResult,
   UserDeleteResult,
 } from '@librechat/data-schemas';
+import type { TCustomConfig } from 'librechat-data-provider';
 import type { FilterQuery } from 'mongoose';
 import type { Response } from 'express';
 import type { ServerRequest } from '~/types/http';
 import { parsePagination } from './pagination';
+
+/** Effective balance config for a request (enabled + refill settings), as `getBalanceConfig` returns. */
+export type AdminBalanceConfig = Partial<TCustomConfig['balance']> | null;
+
+/** A `credits`-type transaction used by the admin top-up path (subset of the full `TxData`). */
+export interface AdminCreditTransaction {
+  user: string;
+  tokenType: 'credits';
+  context: string;
+  rawAmount: number;
+  balance?: AdminBalanceConfig;
+}
 
 const MAX_SEARCH_LENGTH = 200;
 
@@ -40,14 +55,36 @@ export interface AdminUsersDeps {
     principalType: PrincipalType;
     principalId: string | Types.ObjectId;
   }) => Promise<void>;
+  /** Reads a user's balance record (tokenCredits + refill settings), or null if none exists. */
+  findBalanceByUser: (user: string) => Promise<IBalance | null>;
+  /** Directly sets balance fields (used by the absolute-`set` path). */
+  upsertBalanceFields: (user: string, fields: IBalanceUpdate) => Promise<IBalance | null>;
+  /** Records a transaction and increments the balance (used by the `add`/top-up path). */
+  createTransaction: (
+    txData: AdminCreditTransaction,
+  ) => Promise<{ balance?: number } | undefined>;
+  /** Resolves the effective balance config for the request (to know if balance is enabled). */
+  resolveBalanceConfig: (req: ServerRequest) => Promise<AdminBalanceConfig>;
 }
 
 export function createAdminUsersHandlers(deps: AdminUsersDeps): {
   listUsers: (req: ServerRequest, res: Response) => Promise<Response>;
   searchUsers: (req: ServerRequest, res: Response) => Promise<Response>;
   deleteUser: (req: ServerRequest, res: Response) => Promise<Response>;
+  getUserBalance: (req: ServerRequest, res: Response) => Promise<Response>;
+  updateUserBalance: (req: ServerRequest, res: Response) => Promise<Response>;
 } {
-  const { findUsers, countUsers, deleteUserById, deleteConfig, deleteAclEntries } = deps;
+  const {
+    findUsers,
+    countUsers,
+    deleteUserById,
+    deleteConfig,
+    deleteAclEntries,
+    findBalanceByUser,
+    upsertBalanceFields,
+    createTransaction,
+    resolveBalanceConfig,
+  } = deps;
 
   async function listUsersHandler(req: ServerRequest, res: Response) {
     try {
@@ -180,9 +217,119 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
     }
   }
 
+  async function getUserBalanceHandler(req: ServerRequest, res: Response) {
+    try {
+      const { id } = req.params as { id: string };
+
+      if (!isValidObjectIdString(id)) {
+        return res.status(400).json({ error: 'Invalid user ID format' });
+      }
+
+      const [targetUser] = await findUsers({ _id: id }, '_id', { limit: 1 });
+      if (!targetUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const [balance, balanceConfig] = await Promise.all([
+        findBalanceByUser(id),
+        resolveBalanceConfig(req),
+      ]);
+
+      const lastRefill =
+        balance?.lastRefill instanceof Date
+          ? balance.lastRefill.toISOString()
+          : (balance?.lastRefill ?? null);
+
+      return res.status(200).json({
+        userId: id,
+        enabled: balanceConfig?.enabled ?? false,
+        tokenCredits: balance?.tokenCredits ?? 0,
+        autoRefillEnabled: balance?.autoRefillEnabled ?? false,
+        refillAmount: balance?.refillAmount ?? null,
+        refillIntervalValue: balance?.refillIntervalValue ?? null,
+        refillIntervalUnit: balance?.refillIntervalUnit ?? null,
+        lastRefill,
+      });
+    } catch (error) {
+      logger.error('[adminUsers] getUserBalance error:', error);
+      return res.status(500).json({ error: 'Failed to fetch user balance' });
+    }
+  }
+
+  async function updateUserBalanceHandler(req: ServerRequest, res: Response) {
+    try {
+      const { id } = req.params as { id: string };
+
+      if (!isValidObjectIdString(id)) {
+        return res.status(400).json({ error: 'Invalid user ID format' });
+      }
+
+      const body = (req.body ?? {}) as { mode?: unknown; amount?: unknown };
+      const mode = body.mode;
+      const amount = typeof body.amount === 'number' ? body.amount : Number(body.amount);
+
+      if (mode !== 'set' && mode !== 'add') {
+        return res.status(400).json({ error: "Field 'mode' must be 'set' or 'add'" });
+      }
+      if (!Number.isFinite(amount)) {
+        return res.status(400).json({ error: "Field 'amount' must be a finite number" });
+      }
+      if (mode === 'set' && amount < 0) {
+        return res.status(400).json({ error: "Field 'amount' must be >= 0 when mode is 'set'" });
+      }
+
+      const [targetUser] = await findUsers({ _id: id }, '_id', { limit: 1 });
+      if (!targetUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      if (mode === 'set') {
+        const updated = await upsertBalanceFields(id, { tokenCredits: amount });
+        return res.status(200).json({
+          userId: id,
+          mode,
+          tokenCredits: updated?.tokenCredits ?? amount,
+        });
+      }
+
+      const balanceConfig = await resolveBalanceConfig(req);
+      if (!balanceConfig?.enabled) {
+        return res.status(409).json({
+          error:
+            'Balance is not enabled; cannot record a credit transaction. Enable balance in config or use mode "set".',
+        });
+      }
+
+      const result = await createTransaction({
+        user: id,
+        tokenType: 'credits',
+        context: 'admin',
+        rawAmount: amount,
+        balance: balanceConfig,
+      });
+
+      if (!result || typeof result.balance !== 'number') {
+        logger.error('[adminUsers] updateUserBalance: transaction returned no balance', { id });
+        return res.status(500).json({ error: 'Failed to update user balance' });
+      }
+
+      return res.status(200).json({
+        userId: id,
+        mode,
+        amount,
+        tokenCredits: result.balance,
+      });
+    } catch (error) {
+      logger.error('[adminUsers] updateUserBalance error:', error);
+      return res.status(500).json({ error: 'Failed to update user balance' });
+    }
+  }
+
   return {
     listUsers: listUsersHandler,
     searchUsers: searchUsersHandler,
     deleteUser: deleteUserHandler,
+    getUserBalance: getUserBalanceHandler,
+    updateUserBalance: updateUserBalanceHandler,
   };
 }
