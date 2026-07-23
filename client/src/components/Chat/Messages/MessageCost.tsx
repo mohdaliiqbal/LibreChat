@@ -27,7 +27,7 @@ function MessageCost({ message }: { message?: TMessage | null }) {
 
   return (
     <span
-      className="text-text-secondary/70"
+      className="inline-flex select-none items-center whitespace-nowrap rounded-full border border-border-medium bg-surface-secondary px-2 py-0.5 text-xs font-medium leading-none text-text-secondary"
       title={localize('com_ui_message_cost')}
       aria-label={localize('com_ui_message_cost')}
     >
