@@ -13,6 +13,7 @@ import SiblingSwitch from './SiblingSwitch';
 import MultiMessage from './MultiMessage';
 import HoverButtons from './HoverButtons';
 import SubRow from './SubRow';
+import MessageCost from './MessageCost';
 import store from '~/store';
 
 export default function Message(props: TMessageProps) {
@@ -179,6 +180,7 @@ export default function Message(props: TMessageProps) {
                       latestMessageId={latestMessageId}
                       isLast={isLast}
                     />
+                    <MessageCost message={message} />
                   </SubRow>
                 )}
               </div>
