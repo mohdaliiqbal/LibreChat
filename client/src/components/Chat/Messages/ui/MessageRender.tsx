@@ -12,6 +12,7 @@ import SiblingSwitch from '~/components/Chat/Messages/SiblingSwitch';
 import HoverButtons from '~/components/Chat/Messages/HoverButtons';
 import MessageIcon from '~/components/Chat/Messages/MessageIcon';
 import SubRow from '~/components/Chat/Messages/SubRow';
+import MessageCost from '~/components/Chat/Messages/MessageCost';
 import { fontSizeAtom } from '~/store/fontSize';
 import { MessageContext } from '~/Providers';
 import store from '~/store';
@@ -261,6 +262,7 @@ const MessageRender = memo(function MessageRender({
                 handleFeedback={handleFeedback}
                 isLast={isLast}
               />
+              <MessageCost message={msg} />
             </SubRow>
           )}
         </div>
