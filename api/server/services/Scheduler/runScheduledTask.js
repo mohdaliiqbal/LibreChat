@@ -1,7 +1,6 @@
 const crypto = require('crypto');
 const { Constants } = require('librechat-data-provider');
 const { logger } = require('@librechat/data-schemas');
-const { OpenAIChatCompletionController } = require('~/server/controllers/agents/openai');
 const { getAppConfig } = require('~/server/services/Config');
 const db = require('~/models');
 
@@ -135,6 +134,8 @@ async function runScheduledTask(taskId) {
     task.target === 'reuse' && task.conversationId ? task.conversationId : crypto.randomUUID();
 
   try {
+    // Lazy require to avoid any boot-time circular-dependency with the agents controller.
+    const { OpenAIChatCompletionController } = require('~/server/controllers/agents/openai');
     const appConfig = await getAppConfig({ role: owner.role, tenantId: owner.tenantId });
     const { req, res, captured } = buildContext({
       owner,
