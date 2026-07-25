@@ -11,6 +11,7 @@ import PlaceholderRow from '~/components/Chat/Messages/ui/PlaceholderRow';
 import SiblingSwitch from '~/components/Chat/Messages/SiblingSwitch';
 import HoverButtons from '~/components/Chat/Messages/HoverButtons';
 import MessageIcon from '~/components/Chat/Messages/MessageIcon';
+import MessageCost from '~/components/Chat/Messages/MessageCost';
 import SubRow from '~/components/Chat/Messages/SubRow';
 import { fontSizeAtom } from '~/store/fontSize';
 import store from '~/store';
@@ -255,6 +256,7 @@ const ContentRender = memo(function ContentRender({
                 handleFeedback={handleFeedback}
                 isLast={isLast}
               />
+              <MessageCost message={msg} />
             </SubRow>
           )}
         </div>
