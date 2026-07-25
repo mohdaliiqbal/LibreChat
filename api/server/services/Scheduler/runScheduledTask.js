@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const { Constants } = require('librechat-data-provider');
 const { logger } = require('@librechat/data-schemas');
-const OpenAIChatCompletionController = require('~/server/controllers/agents/openai');
+const { OpenAIChatCompletionController } = require('~/server/controllers/agents/openai');
 const { getAppConfig } = require('~/server/services/Config');
 const db = require('~/models');
 
