@@ -137,6 +137,22 @@ async function runScheduledTask(taskId) {
     // Lazy require to avoid any boot-time circular-dependency with the agents controller.
     const { OpenAIChatCompletionController } = require('~/server/controllers/agents/openai');
     const appConfig = await getAppConfig({ role: owner.role, tenantId: owner.tenantId });
+
+    // Create the conversation up front: the compat controller 404s on an unknown
+    // conversation_id, and this makes the run attributable to a real conversation.
+    const ctx = { userId: owner._id.toString() };
+    await db.saveConvo(
+      ctx,
+      {
+        conversationId,
+        endpoint: 'agents',
+        agent_id: task.agentId,
+        model,
+        title: `⏰ ${task.name}`,
+      },
+      { context: 'scheduledTask' },
+    );
+
     const { req, res, captured } = buildContext({
       owner,
       appConfig,
@@ -164,20 +180,7 @@ async function runScheduledTask(taskId) {
     const usage = completion?.usage;
     const costUsd = computeCostUsd(model, usage);
 
-    // Persist so the run appears in the owner's chat history.
-    const ctx = { userId: owner._id.toString() };
-    await db.saveConvo(
-      ctx,
-      {
-        conversationId,
-        endpoint: 'agents',
-        agent_id: task.agentId,
-        model,
-        title: `⏰ ${task.name}`,
-      },
-      { context: 'scheduledTask' },
-    );
-
+    // Persist the messages so the run appears in the owner's chat history.
     const userMessageId = crypto.randomUUID();
     await db.saveMessage(ctx, {
       messageId: userMessageId,
