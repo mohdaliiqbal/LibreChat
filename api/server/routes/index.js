@@ -21,6 +21,7 @@ const skills = require('./skills');
 const balance = require('./balance');
 const actions = require('./actions');
 const apiKeys = require('./apiKeys');
+const scheduledTasks = require('./scheduledTasks');
 const banner = require('./banner');
 const search = require('./search');
 const models = require('./models');
@@ -53,6 +54,7 @@ module.exports = {
   adminAuditLog,
   keys,
   apiKeys,
+  scheduledTasks,
   user,
   tags,
   roles,
