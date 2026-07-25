@@ -4,6 +4,7 @@ import { createConversationTagModel } from './conversationTag';
 import { createAgentCategoryModel } from './agentCategory';
 import { createChatProjectModel } from './chatProject';
 import { createAgentApiKeyModel } from './agentApiKey';
+import { createScheduledTaskModel } from './scheduledTask';
 import { createTransactionModel } from './transaction';
 import { createPromptGroupModel } from './promptGroup';
 import { createSystemGrantModel } from './systemGrant';
@@ -48,6 +49,7 @@ export function createModels(mongoose: typeof import('mongoose')): {
   Message: ReturnType<typeof createMessageModel>;
   Agent: ReturnType<typeof createAgentModel>;
   AgentApiKey: ReturnType<typeof createAgentApiKeyModel>;
+  ScheduledTask: ReturnType<typeof createScheduledTaskModel>;
   AgentCategory: ReturnType<typeof createAgentCategoryModel>;
   MCPServer: ReturnType<typeof createMCPServerModel>;
   Role: ReturnType<typeof createRoleModel>;
@@ -86,6 +88,7 @@ export function createModels(mongoose: typeof import('mongoose')): {
     Message: createMessageModel(mongoose),
     Agent: createAgentModel(mongoose),
     AgentApiKey: createAgentApiKeyModel(mongoose),
+    ScheduledTask: createScheduledTaskModel(mongoose),
     AgentCategory: createAgentCategoryModel(mongoose),
     MCPServer: createMCPServerModel(mongoose),
     Role: createRoleModel(mongoose),

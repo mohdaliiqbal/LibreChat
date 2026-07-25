@@ -11,6 +11,8 @@ import { createMemoryMethods, type MemoryMethods } from './memory';
 import { createAgentCategoryMethods, type AgentCategoryMethods } from './agentCategory';
 /* Agent API Keys */
 import { createAgentApiKeyMethods, type AgentApiKeyMethods } from './agentApiKey';
+/* Scheduled Tasks */
+import { createScheduledTaskMethods, type ScheduledTaskMethods } from './scheduledTask';
 /* MCP Servers */
 import { createMCPServerMethods, type MCPServerMethods } from './mcpServer';
 /* Plugin Auth */
@@ -120,6 +122,7 @@ export type AllMethods = UserMethods &
   MemoryMethods &
   AgentCategoryMethods &
   AgentApiKeyMethods &
+  ScheduledTaskMethods &
   MCPServerMethods &
   UserGroupMethods &
   AclEntryMethods &
@@ -247,6 +250,7 @@ export function createMethods(
     ...createMemoryMethods(mongoose),
     ...createAgentCategoryMethods(mongoose),
     ...createAgentApiKeyMethods(mongoose),
+    ...createScheduledTaskMethods(mongoose),
     ...createMCPServerMethods(mongoose),
     ...createAccessRoleMethods(mongoose),
     ...createUserGroupMethods(mongoose),
@@ -292,6 +296,7 @@ export type {
   MemoryMethods,
   AgentCategoryMethods,
   AgentApiKeyMethods,
+  ScheduledTaskMethods,
   MCPServerMethods,
   UserGroupMethods,
   AclEntryMethods,
