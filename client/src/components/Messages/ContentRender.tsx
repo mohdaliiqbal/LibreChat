@@ -237,6 +237,7 @@ const ContentRender = memo(function ContentRender({
             <PlaceholderRow />
           ) : (
             <SubRow classes="text-xs">
+              <MessageCost message={msg} />
               <SiblingSwitch
                 siblingIdx={siblingIdx}
                 siblingCount={siblingCount}
@@ -256,7 +257,6 @@ const ContentRender = memo(function ContentRender({
                 handleFeedback={handleFeedback}
                 isLast={isLast}
               />
-              <MessageCost message={msg} />
             </SubRow>
           )}
         </div>

@@ -162,6 +162,7 @@ export default function Message(props: TMessageProps) {
                   <div className="mt-1 h-[31px] bg-transparent" />
                 ) : (
                   <SubRow classes="text-xs">
+                    <MessageCost message={message} />
                     <SiblingSwitch
                       siblingIdx={siblingIdx}
                       siblingCount={siblingCount}
@@ -180,7 +181,6 @@ export default function Message(props: TMessageProps) {
                       latestMessageId={latestMessageId}
                       isLast={isLast}
                     />
-                    <MessageCost message={message} />
                   </SubRow>
                 )}
               </div>
