@@ -485,6 +485,10 @@ export const regenerateBackupCodes = () => `${BASE_URL}/api/auth/2fa/backup/rege
 export const verifyTwoFactorTemp = () => `${BASE_URL}/api/auth/2fa/verify-temp`;
 
 /* Memories */
+export const scheduledTasks = () => `${BASE_URL}/api/scheduled-tasks`;
+export const scheduledTask = (id: string) => `${scheduledTasks()}/${id}`;
+export const runScheduledTask = (id: string) => `${scheduledTask(id)}/run`;
+
 export const memories = () => `${BASE_URL}/api/memories`;
 export const memory = (key: string) => `${memories()}/${encodeURIComponent(key)}`;
 export const memoryPreferences = () => `${memories()}/preferences`;

@@ -8,6 +8,7 @@ import {
   ScrollText,
   ArrowRightToLine,
   SlidersHorizontal,
+  CalendarClock,
 } from 'lucide-react';
 import {
   Permissions,
@@ -31,6 +32,7 @@ import BookmarkPanel from '~/components/SidePanel/Bookmarks/BookmarkPanel';
 import PanelSwitch from '~/components/SidePanel/Builder/PanelSwitch';
 import Parameters from '~/components/SidePanel/Parameters/Panel';
 import { MemoryPanel } from '~/components/SidePanel/Memories';
+import { ScheduledPanel } from '~/components/SidePanel/Scheduled';
 import FilesPanel from '~/components/SidePanel/Files/Panel';
 import { PromptsAccordion } from '~/components/Prompts';
 import { SkillsAccordion } from '~/components/Skills';
@@ -176,6 +178,14 @@ export default function useSideNavLinks({
       icon: AttachmentIcon,
       id: 'files',
       Component: FilesPanel,
+    });
+
+    links.push({
+      title: 'com_sidepanel_scheduled',
+      label: '',
+      icon: CalendarClock,
+      id: 'scheduled',
+      Component: ScheduledPanel,
     });
 
     if (

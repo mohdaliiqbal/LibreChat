@@ -1294,6 +1294,32 @@ export function verifyTwoFactorTemp(
   return request.post(endpoints.verifyTwoFactorTemp(), payload);
 }
 
+/* Scheduled Tasks */
+export const getScheduledTasks = (): Promise<q.ScheduledTasksResponse> => {
+  return request.get(endpoints.scheduledTasks());
+};
+
+export const createScheduledTask = (
+  data: q.TScheduledTaskInput,
+): Promise<q.TScheduledTask> => {
+  return request.post(endpoints.scheduledTasks(), data);
+};
+
+export const updateScheduledTask = (
+  id: string,
+  data: q.TScheduledTaskInput,
+): Promise<q.TScheduledTask> => {
+  return request.patch(endpoints.scheduledTask(id), data);
+};
+
+export const deleteScheduledTask = (id: string): Promise<void> => {
+  return request.delete(endpoints.scheduledTask(id));
+};
+
+export const runScheduledTask = (id: string): Promise<q.TScheduledTaskRunResult> => {
+  return request.post(endpoints.runScheduledTask(id), {});
+};
+
 /* Memories */
 export const getMemories = (): Promise<q.MemoriesResponse> => {
   return request.get(endpoints.memories());

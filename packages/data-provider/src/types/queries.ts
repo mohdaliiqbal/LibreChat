@@ -144,6 +144,53 @@ export type VerifyToolAuthResponse = {
 export type GetToolCallParams = { conversationId: string };
 export type ToolCallResults = a.ToolCallResult[];
 
+/* Scheduled Tasks */
+export type TScheduledTaskGuardrails = {
+  quietHoursStart?: number;
+  quietHoursEnd?: number;
+  maxRunsPerDay?: number;
+  maxUsdPerDay?: number;
+};
+
+export type TScheduledTask = {
+  _id: string;
+  user: string;
+  name: string;
+  agentId: string;
+  endpoint?: string;
+  prompt: string;
+  cron: string;
+  timezone?: string;
+  target: 'new' | 'reuse';
+  conversationId?: string;
+  enabled: boolean;
+  guardrails?: TScheduledTaskGuardrails;
+  lastRunAt?: string;
+  nextRunAt?: string;
+  lastRunStatus?: 'success' | 'error' | 'skipped';
+  lastRunError?: string;
+  lastConversationId?: string;
+  runsToday?: number;
+  spendTodayUsd?: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ScheduledTasksResponse = {
+  scheduledTasks: TScheduledTask[];
+};
+
+/** Fields a client may set when creating/updating a scheduled task. */
+export type TScheduledTaskInput = Partial<
+  Omit<TScheduledTask, '_id' | 'user' | 'createdAt' | 'updatedAt'>
+>;
+
+export type TScheduledTaskRunResult = {
+  status: 'success' | 'error' | 'skipped';
+  reason?: string;
+  conversationId?: string;
+};
+
 /* Memories */
 export type TUserMemory = {
   key: string;

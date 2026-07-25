@@ -5,6 +5,8 @@ export * from './Skills';
 export * from './Files';
 /* Memories */
 export * from './Memories';
+/* Scheduled Tasks */
+export * from './ScheduledTasks';
 export * from './Messages';
 export * from './Misc';
 export * from './Projects';

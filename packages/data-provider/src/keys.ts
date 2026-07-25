@@ -60,6 +60,7 @@ export enum QueryKeys {
   banner = 'banner',
   /* Memories */
   memories = 'memories',
+  scheduledTasks = 'scheduledTasks',
   principalSearch = 'principalSearch',
   accessRoles = 'accessRoles',
   resourcePermissions = 'resourcePermissions',
