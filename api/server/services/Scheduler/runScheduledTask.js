@@ -161,6 +161,7 @@ async function runScheduledTask(taskId) {
         agent_id: task.agentId,
         model,
         title: `⏰ ${task.name}`,
+        scheduledTaskId: taskId,
       },
       { context: 'scheduledTask' },
     );

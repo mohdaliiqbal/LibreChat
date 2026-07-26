@@ -20,11 +20,19 @@ export type ConversationListParams = {
   tags?: string[];
   search?: string;
   projectId?: string;
+  scheduledTaskId?: string;
 };
 
 export type MinimalConversation = Pick<
   s.TConversation,
-  'conversationId' | 'endpoint' | 'title' | 'createdAt' | 'updatedAt' | 'user' | 'chatProjectId'
+  | 'conversationId'
+  | 'endpoint'
+  | 'title'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'user'
+  | 'chatProjectId'
+  | 'scheduledTaskId'
 >;
 
 export type ConversationListResponse = {

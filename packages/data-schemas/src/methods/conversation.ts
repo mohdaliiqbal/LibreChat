@@ -533,6 +533,7 @@ export function createConversationMethods(
       sortBy = 'updatedAt',
       sortDirection = 'desc',
       projectId,
+      scheduledTaskId,
     }: {
       cursor?: string | null;
       limit?: number;
@@ -542,6 +543,7 @@ export function createConversationMethods(
       sortBy?: string;
       sortDirection?: string;
       projectId?: string;
+      scheduledTaskId?: string;
     } = {},
   ) {
     const Conversation = mongoose.models.Conversation as Model<IConversation>;
@@ -564,6 +566,16 @@ export function createConversationMethods(
       } as FilterQuery<IConversation>);
     } else if (projectId) {
       filters.push({ chatProjectId: projectId } as FilterQuery<IConversation>);
+    }
+
+    if (scheduledTaskId) {
+      filters.push({ scheduledTaskId } as FilterQuery<IConversation>);
+    } else {
+      // Keep scheduled-run conversations out of the main history list; they are
+      // surfaced under the collapsible "Scheduled" section instead.
+      filters.push({
+        $or: [{ scheduledTaskId: null }, { scheduledTaskId: { $exists: false } }],
+      } as FilterQuery<IConversation>);
     }
 
     filters.push(getVisibleConversationRetentionFilter());
@@ -641,7 +653,7 @@ export function createConversationMethods(
 
       const convos = await Conversation.find(query)
         .select(
-          'conversationId endpoint title createdAt updatedAt user model agent_id assistant_id spec iconURL chatProjectId pinned',
+          'conversationId endpoint title createdAt updatedAt user model agent_id assistant_id spec iconURL chatProjectId scheduledTaskId pinned',
         )
         .sort(sortObj)
         .limit(limit + 1)

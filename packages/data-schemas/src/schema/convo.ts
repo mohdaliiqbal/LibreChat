@@ -39,6 +39,11 @@ const convoSchema: Schema<IConversation> = new Schema(
       default: null,
       index: true,
     },
+    scheduledTaskId: {
+      type: String,
+      default: null,
+      index: true,
+    },
     files: {
       type: [String],
     },

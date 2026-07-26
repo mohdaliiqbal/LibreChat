@@ -44,6 +44,9 @@ router.get('/', async (req, res) => {
   const projectId = Array.isArray(req.query.projectId)
     ? req.query.projectId[0]
     : req.query.projectId;
+  const scheduledTaskId = Array.isArray(req.query.scheduledTaskId)
+    ? req.query.scheduledTaskId[0]
+    : req.query.scheduledTaskId;
 
   if (!isValidProjectFilter(projectId)) {
     return res.status(400).json({ error: 'projectId must be a valid project id or unassigned' });
@@ -64,6 +67,7 @@ router.get('/', async (req, res) => {
       sortBy,
       sortDirection,
       projectId,
+      scheduledTaskId,
     });
     res.status(200).json(result);
   } catch (error) {
