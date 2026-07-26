@@ -1,13 +1,28 @@
 import { memo, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Clock } from 'lucide-react';
 import { Spinner } from '@librechat/client';
 import type { TConversation, TScheduledTask } from 'librechat-data-provider';
 import { useConversationsInfiniteQuery, useScheduledTasksQuery } from '~/data-provider';
 import { useLocalize, useLocalStorage } from '~/hooks';
 import { cn } from '~/utils';
-import Convo from './Convo';
 
-const noop = () => {};
+/** Readable run label from the conversation's createdAt, e.g. "Jul 26, 9:00 AM". */
+const formatRunTime = (value?: string | Date | null) => {
+  if (!value) {
+    return '';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
 
 interface SectionProps {
   toggleNav: () => void;
@@ -23,6 +38,8 @@ const TaskRuns = memo(function TaskRuns({
   toggleNav: () => void;
 }) {
   const localize = useLocalize();
+  const navigate = useNavigate();
+  const { conversationId: activeConversationId } = useParams();
   const { data, isLoading } = useConversationsInfiniteQuery(
     { scheduledTaskId: taskId, sortBy: 'createdAt', sortDirection: 'desc' },
     { staleTime: 30000, cacheTime: 300000 },
@@ -52,15 +69,25 @@ const TaskRuns = memo(function TaskRuns({
 
   return (
     <div data-testid={`task-runs-${taskId}`}>
-      {runs.map((convo) => (
-        <Convo
-          key={convo.conversationId}
-          conversation={convo}
-          retainView={noop}
-          toggleNav={toggleNav}
-          isGenerating={false}
-        />
-      ))}
+      {runs.map((run) => {
+        const isActive = run.conversationId === activeConversationId;
+        return (
+          <button
+            key={run.conversationId}
+            type="button"
+            onClick={() => {
+              navigate(`/c/${run.conversationId}`);
+              toggleNav();
+            }}
+            className={cn(
+              'flex w-full items-center gap-1.5 rounded-lg py-1.5 pl-2 pr-2 text-left text-xs outline-none transition-colors hover:bg-surface-active-alt focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black dark:focus-visible:ring-white',
+              isActive ? 'bg-surface-active-alt text-text-primary' : 'text-text-secondary hover:text-text-primary',
+            )}
+          >
+            <span className="truncate">{formatRunTime(run.createdAt) || run.conversationId}</span>
+          </button>
+        );
+      })}
     </div>
   );
 });
