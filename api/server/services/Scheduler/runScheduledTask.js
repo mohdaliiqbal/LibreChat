@@ -103,8 +103,10 @@ async function runScheduledTask(taskId) {
   const guardrails = task.guardrails ?? {};
 
   const skip = async (reason) => {
+    // Skips aren't conversations, so record them on the task (capped) for the nav panel.
     await db.setScheduledTaskFields(taskId, {
       $set: { lastRunAt: now, lastRunStatus: 'skipped', lastRunError: reason },
+      $push: { recentSkips: { $each: [{ at: now, reason }], $slice: -20 } },
     });
     logger.info(`[scheduler] task ${taskId} skipped: ${reason}`);
     return { status: 'skipped', reason };
@@ -190,8 +192,37 @@ async function runScheduledTask(taskId) {
 
     const completion = captured.body;
     const assistantText = completion?.choices?.[0]?.message?.content ?? '';
-    const usage = completion?.usage;
-    const costUsd = computeCostUsd(model, usage);
+
+    // Full multi-turn cost from the ledger: the compat usage rollup under-reports
+    // agent runs that loop over tools (each turn re-sends growing context). Sum the
+    // transactions written for this conversation during the run.
+    let spendCredits = 0;
+    let inputTokens = 0;
+    let outputTokens = 0;
+    try {
+      const txns = await db.getTransactions({ conversationId });
+      for (const t of txns) {
+        if (t.tokenType !== 'prompt' && t.tokenType !== 'completion') {
+          continue;
+        }
+        spendCredits += Math.abs(t.tokenValue ?? 0);
+        if (t.tokenType === 'prompt') {
+          inputTokens += Math.abs(t.rawAmount ?? 0);
+        } else {
+          outputTokens += Math.abs(t.rawAmount ?? 0);
+        }
+      }
+    } catch (error) {
+      logger.warn('[scheduler] ledger cost read failed:', error?.message);
+    }
+    let costUsd = spendCredits / CREDITS_PER_USD;
+    if (spendCredits === 0) {
+      // Fallback to the usage rollup if the ledger had no rows for this conversation.
+      const usage = completion?.usage;
+      costUsd = computeCostUsd(model, usage);
+      inputTokens = Math.abs(usage?.prompt_tokens ?? 0);
+      outputTokens = Math.abs(usage?.completion_tokens ?? 0);
+    }
 
     // Persist the messages so the run appears in the owner's chat history.
     const userMessageId = crypto.randomUUID();
@@ -217,9 +248,9 @@ async function runScheduledTask(taskId) {
       user: ctx.userId,
       metadata: {
         usage: {
-          input_tokens: usage?.prompt_tokens ?? 0,
-          output_tokens: usage?.completion_tokens ?? 0,
-          total_tokens: usage?.total_tokens ?? 0,
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+          total_tokens: inputTokens + outputTokens,
           cost: costUsd,
         },
         /** Provenance so the UI/MCP can distinguish a scheduled invocation. */

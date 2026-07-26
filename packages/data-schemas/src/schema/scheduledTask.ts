@@ -44,6 +44,8 @@ export interface IScheduledTask extends Document {
   spendTodayUsd?: number;
   /** Local YYYY-MM-DD the counters above apply to. */
   runDayKey?: string;
+  /** Recent skipped runs (capped) — skips aren't conversations, so surfaced from here. */
+  recentSkips?: Array<{ at: Date; reason: string }>;
   tenantId?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -122,6 +124,10 @@ const scheduledTaskSchema: Schema<IScheduledTask> = new Schema(
     runsToday: { type: Number, default: 0 },
     spendTodayUsd: { type: Number, default: 0 },
     runDayKey: { type: String },
+    recentSkips: {
+      type: [new Schema({ at: { type: Date }, reason: { type: String } }, { _id: false })],
+      default: [],
+    },
     tenantId: {
       type: String,
       index: true,

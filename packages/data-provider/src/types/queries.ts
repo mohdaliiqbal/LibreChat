@@ -180,6 +180,7 @@ export type TScheduledTask = {
   lastConversationId?: string;
   runsToday?: number;
   spendTodayUsd?: number;
+  recentSkips?: Array<{ at: string; reason: string }>;
   createdAt?: string;
   updatedAt?: string;
 };

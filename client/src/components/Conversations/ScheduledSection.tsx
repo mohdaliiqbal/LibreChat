@@ -1,6 +1,6 @@
 import { memo, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronDown, ChevronRight, Clock } from 'lucide-react';
+import { Ban, ChevronDown, ChevronRight, Clock } from 'lucide-react';
 import { Spinner } from '@librechat/client';
 import type { TConversation, TScheduledTask } from 'librechat-data-provider';
 import { useConversationsInfiniteQuery, useScheduledTasksQuery } from '~/data-provider';
@@ -40,10 +40,12 @@ const TaskRuns = memo(function TaskRuns({
   const localize = useLocalize();
   const navigate = useNavigate();
   const { conversationId: activeConversationId } = useParams();
-  const { data, isLoading } = useConversationsInfiniteQuery(
-    { scheduledTaskId: taskId, sortBy: 'createdAt', sortDirection: 'desc' },
-    { staleTime: 30000, cacheTime: 300000 },
-  );
+  const [visibleCount, setVisibleCount] = useState(10);
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useConversationsInfiniteQuery(
+      { scheduledTaskId: taskId, sortBy: 'createdAt', sortDirection: 'desc' },
+      { staleTime: 30000, cacheTime: 300000 },
+    );
 
   const runs = useMemo<TConversation[]>(
     () =>
@@ -67,9 +69,18 @@ const TaskRuns = memo(function TaskRuns({
     );
   }
 
+  const visible = runs.slice(0, visibleCount);
+  const canLoadMore = runs.length > visibleCount || hasNextPage === true;
+  const onMore = () => {
+    setVisibleCount((c) => c + 10);
+    if (runs.length <= visibleCount + 10 && hasNextPage === true && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  };
+
   return (
     <div data-testid={`task-runs-${taskId}`}>
-      {runs.map((run) => {
+      {visible.map((run) => {
         const isActive = run.conversationId === activeConversationId;
         return (
           <button
@@ -88,6 +99,16 @@ const TaskRuns = memo(function TaskRuns({
           </button>
         );
       })}
+      {canLoadMore && (
+        <button
+          type="button"
+          onClick={onMore}
+          disabled={isFetchingNextPage}
+          className="ml-1 mt-0.5 flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-text-secondary outline-none transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black dark:focus-visible:ring-white"
+        >
+          {isFetchingNextPage ? <Spinner className="h-3 w-3" /> : localize('com_ui_load_more')}
+        </button>
+      )}
     </div>
   );
 });
@@ -103,6 +124,10 @@ const TaskItem = memo(function TaskItem({
 }) {
   const localize = useLocalize();
   const [expanded, setExpanded] = useState(false);
+  const skips = useMemo(
+    () => (task.recentSkips ?? []).slice().reverse().slice(0, 10),
+    [task.recentSkips],
+  );
 
   return (
     <li className="list-none">
@@ -133,6 +158,25 @@ const TaskItem = memo(function TaskItem({
       {expanded && (
         <div className="pl-3">
           <TaskRuns taskId={task._id} toggleNav={toggleNav} />
+          {skips.length > 0 && (
+            <div className="mt-1 border-t border-border-light pt-1">
+              <div className="px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-text-secondary">
+                {localize('com_scheduled_skipped')}
+              </div>
+              {skips.map((s, i) => (
+                <div
+                  key={`${s.at}-${i}`}
+                  className="flex items-center gap-1.5 px-2 py-1 text-xs text-text-secondary"
+                  title={s.reason}
+                >
+                  <Ban className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  <span className="truncate">
+                    {formatRunTime(s.at)} · {(s.reason || '').replace(/_/g, ' ')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </li>
