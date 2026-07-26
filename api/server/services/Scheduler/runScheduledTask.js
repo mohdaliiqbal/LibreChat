@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { Constants } = require('librechat-data-provider');
 const { logger } = require('@librechat/data-schemas');
+const { getBalanceConfig } = require('@librechat/api');
 const { getAppConfig } = require('~/server/services/Config');
 const db = require('~/models');
 
@@ -137,6 +138,17 @@ async function runScheduledTask(taskId) {
     // Lazy require to avoid any boot-time circular-dependency with the agents controller.
     const { OpenAIChatCompletionController } = require('~/server/controllers/agents/openai');
     const appConfig = await getAppConfig({ role: owner.role, tenantId: owner.tenantId });
+
+    // Balance gate: the OpenAI-compat run path records spend but does NOT pre-gate on
+    // balance, so honor the user's budget here — skip when balance is enabled and exhausted.
+    const balanceConfig = getBalanceConfig(appConfig);
+    if (balanceConfig?.enabled) {
+      const record = await db.findBalanceByUser(owner._id.toString());
+      const credits = record?.tokenCredits ?? 0;
+      if (credits <= 0) {
+        return skip('insufficient_balance');
+      }
+    }
 
     // Create the conversation up front: the compat controller 404s on an unknown
     // conversation_id, and this makes the run attributable to a real conversation.
