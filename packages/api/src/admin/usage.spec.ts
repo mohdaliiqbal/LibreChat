@@ -147,4 +147,24 @@ describe('createAdminUsageHandlers.getUsageSummary', () => {
     await createAdminUsageHandlers(deps).getUsageSummary(req, res);
     expect(status).toHaveBeenCalledWith(500);
   });
+
+  it('returns per-day activity with the dominant model + totals', async () => {
+    const day = new Date();
+    const deps = createDeps({
+      getTransactions: jest.fn().mockResolvedValue([
+        tx({ tokenType: 'completion', model: 'claude-opus-4-8', tokenValue: -100, rawAmount: -100, createdAt: day }),
+        tx({ tokenType: 'prompt', model: 'gpt-4o', tokenValue: -30, rawAmount: -30, createdAt: day }),
+      ]),
+      findUsers: jest.fn().mockResolvedValue([mockUser(userA)]),
+    });
+    const { req, res, json } = createReqRes();
+    await createAdminUsageHandlers(deps).getUsageSummary(req, res);
+    const body = json.mock.calls[0][0];
+    const entry = body.activity.find((a: { date: string }) => a.date === day.toISOString().slice(0, 10));
+    expect(entry).toBeTruthy();
+    expect(entry.tokens).toBe(130);
+    expect(entry.model).toBe('claude-opus-4-8');
+    expect(body.activityTotals.activeDays).toBeGreaterThanOrEqual(1);
+    expect(body.activityTotals.lifetimeTokens).toBe(130);
+  });
 });

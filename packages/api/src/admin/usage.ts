@@ -159,6 +159,44 @@ export function createAdminUsageHandlers(deps: AdminUsageDeps): {
         }))
         .sort((a, b) => a.model.localeCompare(b.model));
 
+      // Activity heatmap: per-day dominant model + tokens over the last 365 days
+      // (independent of the summary range), for a GitHub-style contribution grid.
+      const HEATMAP_DAYS = 365;
+      const heatFrom = new Date(toDate.getTime() - HEATMAP_DAYS * 86_400_000);
+      const heatTxns = await getTransactions({ createdAt: { $gte: heatFrom, $lte: toDate } });
+      const dayActivity = new Map<string, { tokens: number; perModel: Map<string, number> }>();
+      let lifetimeTokens = 0;
+      for (const t of heatTxns) {
+        if (!t.tokenType || !SPEND_TOKEN_TYPES.has(t.tokenType) || !t.createdAt) {
+          continue;
+        }
+        const day = dayKey(new Date(t.createdAt));
+        const tokens = Math.abs(t.rawAmount ?? 0);
+        const model = t.model || 'unknown';
+        lifetimeTokens += tokens;
+        const e = dayActivity.get(day) ?? { tokens: 0, perModel: new Map<string, number>() };
+        e.tokens += tokens;
+        e.perModel.set(model, (e.perModel.get(model) ?? 0) + tokens);
+        dayActivity.set(day, e);
+      }
+      let peakDayTokens = 0;
+      const activity = [...dayActivity.entries()]
+        .map(([date, e]) => {
+          let topModel = 'unknown';
+          let topTokens = -1;
+          for (const [m, tk] of e.perModel) {
+            if (tk > topTokens) {
+              topTokens = tk;
+              topModel = m;
+            }
+          }
+          if (e.tokens > peakDayTokens) {
+            peakDayTokens = e.tokens;
+          }
+          return { date, tokens: e.tokens, model: topModel };
+        })
+        .sort((a, b) => (a.date < b.date ? -1 : 1));
+
       return res.status(200).json({
         range: { from: fromDate.toISOString(), to: toDate.toISOString() },
         currency: 'USD',
@@ -172,6 +210,12 @@ export function createAdminUsageHandlers(deps: AdminUsageDeps): {
         byModel,
         timeseries,
         modelPricing: pricing,
+        activity,
+        activityTotals: {
+          lifetimeTokens,
+          peakDayTokens,
+          activeDays: activity.length,
+        },
       });
     } catch (error) {
       logger.error('[adminUsage] getUsageSummary error:', error);
